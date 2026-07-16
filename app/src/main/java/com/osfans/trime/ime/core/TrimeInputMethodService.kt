@@ -478,8 +478,8 @@ open class TrimeInputMethodService : LifecycleInputMethodService() {
     }
 
     // always show InputView since we delegate CandidatesView's visibility to it
-    @SuppressLint("MissingSuperCall")
-    override fun onEvaluateInputViewShown() = true
+    override fun onEvaluateInputViewShown() =
+        super.onEvaluateInputViewShown()
 
     fun superEvaluateInputViewShown() = super.onEvaluateInputViewShown()
 
