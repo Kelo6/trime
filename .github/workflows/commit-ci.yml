@@ -3,7 +3,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 name: Commit
-on: [push]
+on:
+  workflow_dispatch:
+  push:
 
 env:
   CI_NAME: Commit CI

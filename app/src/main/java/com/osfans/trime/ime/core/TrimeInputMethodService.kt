@@ -477,9 +477,8 @@ open class TrimeInputMethodService : LifecycleInputMethodService() {
         }
     }
 
-    // always show InputView since we delegate CandidatesView's visibility to it
-    override fun onEvaluateInputViewShown() =
-        super.onEvaluateInputViewShown()
+    // Follow the system policy for showing the input view with a hardware keyboard.
+    override fun onEvaluateInputViewShown() = super.onEvaluateInputViewShown()
 
     fun superEvaluateInputViewShown() = super.onEvaluateInputViewShown()
 
