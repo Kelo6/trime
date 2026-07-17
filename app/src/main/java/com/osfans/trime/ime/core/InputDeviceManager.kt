@@ -23,61 +23,72 @@ class InputDeviceManager(
 
     private val candidatesViewMode by AppPrefs.defaultInstance().candidates.mode
 
-    private val alwaysShowCandidatesView: Boolean
-        get() = candidatesViewMode == PopupCandidatesMode.ALWAYS_SHOW
-
     private fun setupInputViewCallback(isVirtual: Boolean) {
         inputView?.handleMessages = isVirtual
         inputView?.visibility = if (isVirtual) View.VISIBLE else View.GONE
     }
 
-    private fun setupCandidatesViewCallback(isVirtual: Boolean) {
-        val shouldSetupView = !isVirtual || alwaysShowCandidatesView
-        candidatesView?.handleMessages = shouldSetupView
-        if (!shouldSetupView) {
+    private fun setupCandidatesViewCallback(useCandidatesView: Boolean) {
+        candidatesView?.handleMessages = useCandidatesView
+        if (!useCandidatesView) {
             candidatesView?.visibility = View.GONE
         }
     }
 
-    private fun setupViewCallbacks(isVirtual: Boolean) {
-        setupInputViewCallback(isVirtual)
-        setupCandidatesViewCallback(isVirtual)
+    private fun setupViewCallbacks() {
+        setupInputViewCallback(isVirtualKeyboard)
+        setupCandidatesViewCallback(isCandidatesView)
     }
 
     var isVirtualKeyboard = true
-        private set(value) {
-            field = value
-            setupViewCallbacks(value)
-        }
+        private set
+
+    private var isCandidatesView = false
 
     fun setInputView(inputView: InputView) {
         this.inputView = inputView
-        setupInputViewCallback(this.isVirtualKeyboard)
+        setupInputViewCallback(isVirtualKeyboard)
     }
 
     fun setCandidatesView(candidatesView: CandidatesView) {
         this.candidatesView = candidatesView
-        setupCandidatesViewCallback(this.isVirtualKeyboard)
+        setupCandidatesViewCallback(isCandidatesView)
+    }
+
+    private fun shouldUseCandidatesView(useVirtualKeyboard: Boolean): Boolean = when (candidatesViewMode) {
+        PopupCandidatesMode.ALWAYS_SHOW -> true
+        PopupCandidatesMode.DISABLED -> false
+        PopupCandidatesMode.SYSTEM_DEFAULT,
+        PopupCandidatesMode.INPUT_DEVICE,
+        -> !useVirtualKeyboard
     }
 
     private fun applyMode(
         service: TrimeInputMethodService,
         useVirtualKeyboard: Boolean,
     ) {
-        val useCandidatesView = !useVirtualKeyboard || alwaysShowCandidatesView
+        val useCandidatesView = shouldUseCandidatesView(useVirtualKeyboard)
         service.postRimeJob {
             // restart rime or start rime deploy will reset the options
             // in rime engine, so we need to always set the option on
             // each evaluation
             setRuntimeOption("paging_mode", useCandidatesView)
         }
-        if (useVirtualKeyboard == isVirtualKeyboard) {
+        val virtualKeyboardChanged = useVirtualKeyboard != isVirtualKeyboard
+        val candidatesViewChanged = useCandidatesView != isCandidatesView
+        if (!virtualKeyboardChanged && !candidatesViewChanged) {
             return
         }
-        // monitor CursorAnchorInfo when switching to CandidatesView
-        service.currentInputConnection.monitorCursorAnchor(!useVirtualKeyboard)
+        if (candidatesViewChanged) {
+            // CursorAnchorInfo is only needed while the floating candidates window is active.
+            service.currentInputConnection?.monitorCursorAnchor(useCandidatesView)
+        }
         isVirtualKeyboard = useVirtualKeyboard
-        onChange(isVirtualKeyboard)
+        isCandidatesView = useCandidatesView
+        setupViewCallbacks()
+        if (virtualKeyboardChanged) {
+            onChange(isVirtualKeyboard)
+        }
     }
 
     private var startedInputView = false
@@ -97,9 +108,9 @@ class InputDeviceManager(
                 PopupCandidatesMode.SYSTEM_DEFAULT -> service.superEvaluateInputViewShown()
                 PopupCandidatesMode.INPUT_DEVICE -> isVirtualKeyboard
                 PopupCandidatesMode.ALWAYS_SHOW -> true
-                PopupCandidatesMode.DISABLED -> true
+                PopupCandidatesMode.DISABLED -> service.superEvaluateInputViewShown()
             }
-        val useCandidatesView = !useVirtualKeyboard || alwaysShowCandidatesView
+        val useCandidatesView = shouldUseCandidatesView(useVirtualKeyboard)
         applyMode(service, useVirtualKeyboard)
         return useVirtualKeyboard to useCandidatesView
     }
@@ -136,7 +147,7 @@ class InputDeviceManager(
                 PopupCandidatesMode.SYSTEM_DEFAULT -> service.superEvaluateInputViewShown()
                 PopupCandidatesMode.INPUT_DEVICE -> false
                 PopupCandidatesMode.ALWAYS_SHOW -> false
-                PopupCandidatesMode.DISABLED -> true
+                PopupCandidatesMode.DISABLED -> service.superEvaluateInputViewShown()
             }
         applyMode(service, useVirtualKeyboard)
     }
@@ -146,7 +157,9 @@ class InputDeviceManager(
         val useVirtualKeyboard =
             when (candidatesViewMode) {
                 PopupCandidatesMode.SYSTEM_DEFAULT -> service.superEvaluateInputViewShown()
-                else -> true
+                PopupCandidatesMode.INPUT_DEVICE -> true
+                PopupCandidatesMode.ALWAYS_SHOW -> true
+                PopupCandidatesMode.DISABLED -> service.superEvaluateInputViewShown()
             }
         applyMode(service, useVirtualKeyboard)
     }
@@ -167,7 +180,7 @@ class InputDeviceManager(
                         isVirtualKeyboard
                     }
                 PopupCandidatesMode.ALWAYS_SHOW -> true
-                PopupCandidatesMode.DISABLED -> true
+                PopupCandidatesMode.DISABLED -> service.superEvaluateInputViewShown()
             }
         applyMode(service, useVirtualKeyboard)
     }

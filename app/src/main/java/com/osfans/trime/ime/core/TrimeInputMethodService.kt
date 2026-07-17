@@ -477,8 +477,17 @@ open class TrimeInputMethodService : LifecycleInputMethodService() {
         }
     }
 
-    // Follow the system policy for showing the input view with a hardware keyboard.
-    override fun onEvaluateInputViewShown() = super.onEvaluateInputViewShown()
+    /**
+     * Keep the IME window alive even when the system hides the virtual keyboard for a hardware
+     * keyboard. [InputDeviceManager] applies the system policy inside that window by hiding
+     * [InputView] and leaving only [CandidatesView] visible.
+     *
+     * Returning the system value here would prevent Android from starting the input-view
+     * lifecycle altogether. Physical key events would still reach Rime, but there would be no
+     * window in which to display the composition and candidates.
+     */
+    @SuppressLint("MissingSuperCall")
+    override fun onEvaluateInputViewShown() = true
 
     fun superEvaluateInputViewShown() = super.onEvaluateInputViewShown()
 

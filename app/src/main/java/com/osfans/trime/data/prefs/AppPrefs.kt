@@ -345,9 +345,14 @@ class AppPrefs(
             const val POSITION = "candidates_window_position"
         }
 
-        val mode = enum(R.string.show_candidates_window, MODE, PopupCandidatesMode.DISABLED)
+        // Follow Android's virtual-keyboard visibility policy by default. On devices with a
+        // hardware keyboard this keeps the full soft keyboard hidden while CandidatesView shows
+        // the composition and candidates in the lightweight IME window.
+        val mode = enum(R.string.show_candidates_window, MODE, PopupCandidatesMode.SYSTEM_DEFAULT)
         val layout = enum(R.string.candidates_layout, LAYOUT, PopupCandidatesLayout.AUTOMATIC)
-        val position = enum(R.string.candidates_window_position, POSITION, PopupPosition.BOTTOM_LEFT)
+
+        // A cursor-following window is easier to use on tablets and other large-screen devices.
+        val position = enum(R.string.candidates_window_position, POSITION, PopupPosition.FOLLOW)
     }
 
     /**
