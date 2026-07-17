@@ -28,6 +28,7 @@ import timber.log.Timber
 object ClipboardHelper :
     ClipboardManager.OnPrimaryClipChangedListener,
     CoroutineScope by CoroutineScope(SupervisorJob() + Dispatchers.Default) {
+    private lateinit var context: Context
     private lateinit var clbDb: Database
     private lateinit var clbDao: DatabaseDao
 
@@ -98,6 +99,7 @@ object ClipboardHelper :
     }
 
     fun init(context: Context) {
+        this.context = context.applicationContext
         clipboardManager.addPrimaryClipChangedListener(this)
         clbDb =
             Room
@@ -159,21 +161,26 @@ object ClipboardHelper :
      */
     override fun onPrimaryClipChanged() {
         val clip = clipboardManager.primaryClip ?: return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val timestamp = clip.description.timestamp
-            if (timestamp == lastClipTimestamp) return
-            lastClipTimestamp = timestamp
-        } else {
-            val timestamp = System.currentTimeMillis()
-            val hash = clip.hashCode()
-            if (timestamp - lastClipTimestamp < 100L && hash == lastClipHash) return
-            lastClipTimestamp = timestamp
-            lastClipHash = hash
-        }
+        val timestamp =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                clip.description.timestamp
+            } else {
+                System.currentTimeMillis()
+            }
         launch {
             mutex.withLock {
-                val bean = DatabaseBean.fromClipData(clip) ?: return@withLock
+                val bean = DatabaseBean.fromClipData(context, clip) ?: return@withLock
                 if (bean.text.isNullOrBlank()) return@withLock
+                val hash = bean.text.hashCode()
+                val isDuplicate =
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        timestamp == lastClipTimestamp && hash == lastClipHash
+                    } else {
+                        timestamp - lastClipTimestamp < 100L && hash == lastClipHash
+                    }
+                if (isDuplicate) return@withLock
+                lastClipTimestamp = timestamp
+                lastClipHash = hash
                 if (bean.text.matchesAny(outputRules) ||
                     bean.text.removeRegexSet(compareRules).isEmpty()
                 ) {

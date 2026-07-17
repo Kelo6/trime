@@ -5,11 +5,13 @@
 package com.osfans.trime.data.db
 
 import android.content.ClipData
+import android.content.Context
 import android.view.inputmethod.ExtractedTextRequest
 import android.view.inputmethod.InputConnection
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.room.TypeConverter
+import com.osfans.trime.util.coerceToTextWithFallback
 
 @Entity(tableName = DatabaseBean.TABLE_NAME)
 data class DatabaseBean(
@@ -24,8 +26,11 @@ data class DatabaseBean(
     companion object {
         const val TABLE_NAME = "t_data"
 
-        fun fromClipData(clipData: ClipData): DatabaseBean? {
-            val str = clipData.getItemAt(0).text?.toString() ?: return null
+        fun fromClipData(
+            context: Context,
+            clipData: ClipData,
+        ): DatabaseBean? {
+            val str = clipData.coerceToTextWithFallback(context)?.toString() ?: return null
             return DatabaseBean(text = str)
         }
 

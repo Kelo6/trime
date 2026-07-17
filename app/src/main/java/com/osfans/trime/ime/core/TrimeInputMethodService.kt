@@ -52,6 +52,7 @@ import com.osfans.trime.ime.composition.CandidatesView
 import com.osfans.trime.ime.keyboard.InputFeedbackManager
 import com.osfans.trime.receiver.RimeIntentReceiver
 import com.osfans.trime.util.any
+import com.osfans.trime.util.coerceToTextWithFallback
 import com.osfans.trime.util.findSectionFrom
 import com.osfans.trime.util.forceShowSelf
 import com.osfans.trime.util.monitorCursorAnchor
@@ -873,7 +874,7 @@ open class TrimeInputMethodService : LifecycleInputMethodService() {
                     val et = ic.getExtractedText(etr, 0)
                     if (et == null) {
                         Timber.d("hookKeyboard paste, et == null, try commitText")
-                        val clipboardText = clipboardManager.primaryClip?.getItemAt(0)?.coerceToText(this)
+                        val clipboardText = clipboardManager.primaryClip?.coerceToTextWithFallback(this)
                         if (ic.commitText(clipboardText, 1)) {
                             return true
                         }

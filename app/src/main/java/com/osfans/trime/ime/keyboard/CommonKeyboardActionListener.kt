@@ -39,6 +39,7 @@ import com.osfans.trime.util.AppUtils
 import com.osfans.trime.util.InputMethodUtils
 import com.osfans.trime.util.buildIntentFromAction
 import com.osfans.trime.util.buildIntentFromArgument
+import com.osfans.trime.util.coerceToTextWithFallback
 import com.osfans.trime.util.customFormatDateTime
 import com.osfans.trime.util.isAsciiPrintable
 import com.osfans.trime.util.toast
@@ -258,8 +259,7 @@ class CommonKeyboardActionListener {
 
             private fun handleClipboard() {
                 clipboardManager.primaryClip
-                    ?.getItemAt(0)
-                    ?.coerceToText(service)
+                    ?.coerceToTextWithFallback(service)
                     ?.let { service.commitText(it.toString()) }
             }
 
