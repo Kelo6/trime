@@ -8,6 +8,7 @@ package com.osfans.trime.ime.composition
 import android.annotation.SuppressLint
 import android.graphics.RectF
 import android.os.Build
+import android.view.View
 import android.view.ViewGroup
 import android.view.ViewOutlineProvider
 import android.view.ViewTreeObserver.OnGlobalLayoutListener
@@ -45,6 +46,17 @@ import splitties.views.horizontalPadding
 import splitties.views.setPaddingDp
 import splitties.views.verticalPadding
 import kotlin.math.roundToInt
+
+internal fun clampCandidatePosition(
+    position: Float,
+    parentSize: Float,
+    candidateSize: Float,
+    spacing: Float,
+): Float {
+    val maximum = (parentSize - candidateSize - spacing).coerceAtLeast(0f)
+    val minimum = if (maximum >= spacing) spacing else 0f
+    return position.takeIf { it.isFinite() }?.coerceIn(minimum, maximum) ?: minimum
+}
 
 @SuppressLint("ViewConstructor")
 class CandidatesView(
@@ -146,7 +158,11 @@ class CandidatesView(
 
     private fun updatePosition() {
         if (visibility != VISIBLE) return
-        val (parentWidth, parentHeight) = parentSize
+        val parentView = parent as? View
+        val parentWidth = parentView?.width?.takeIf { it > 0 }?.toFloat() ?: parentSize[0]
+        val parentHeight = parentView?.height?.takeIf { it > 0 }?.toFloat() ?: parentSize[1]
+        parentSize[0] = parentWidth
+        parentSize[1] = parentHeight
         if (parentWidth <= 0 || parentHeight <= 0) {
             translationX = 0f
             translationY = 0f
@@ -194,10 +210,12 @@ class CandidatesView(
                 y = if (bottom + selfHeight > bottomLimit) top - selfHeight - spacingDp else bottom + spacingDp
             }
         }
-        translationX = x
-        translationY = y
+        val clampedX = clampCandidatePosition(x, parentWidth, selfWidth, spacingDp)
+        val clampedY = clampCandidatePosition(y, parentHeight - bottomInsets, selfHeight, spacingDp)
+        translationX = clampedX
+        translationY = clampedY
         // update touchEventReceiverWindow's position after CandidatesView's
-        touchEventReceiverWindow.showAt(x.roundToInt(), y.roundToInt(), w, h)
+        touchEventReceiverWindow.showAt(clampedX.roundToInt(), clampedY.roundToInt(), w, h)
         shouldUpdatePosition = false
     }
 

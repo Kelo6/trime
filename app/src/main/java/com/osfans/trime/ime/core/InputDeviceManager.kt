@@ -15,6 +15,15 @@ import com.osfans.trime.ime.candidates.popup.PopupCandidatesMode
 import com.osfans.trime.ime.composition.CandidatesView
 import com.osfans.trime.util.monitorCursorAnchor
 
+internal fun shouldForceShowInputView(
+    isNullInputType: Boolean,
+    isCandidatesView: Boolean,
+    isPrintingKey: Boolean,
+    hasNoModifiers: Boolean,
+): Boolean = isPrintingKey &&
+    hasNoModifiers &&
+    (!isNullInputType || isCandidatesView)
+
 class InputDeviceManager(
     private val onChange: (Boolean) -> Unit,
 ) {
@@ -43,7 +52,8 @@ class InputDeviceManager(
     var isVirtualKeyboard = true
         private set
 
-    private var isCandidatesView = false
+    var isCandidatesView = false
+        private set
 
     fun setInputView(inputView: InputView) {
         this.inputView = inputView
@@ -131,9 +141,17 @@ class InputDeviceManager(
             // no need to force show InputView since it's already visible
             return false
         } else {
-            // force show InputView when focusing on text input (likely inputType is not TYPE_NULL)
-            // and pressing any digit/letter/punctuation key on physical keyboard
-            val showInputView = !isNullInputType && e.isPrintingKey && e.hasNoModifiers()
+            // TYPE_NULL editors, such as terminal emulators, may still use the floating
+            // CandidatesView with a physical keyboard. If that view was active before Android
+            // finished the input-view lifecycle, allow a printing key to bring its IME window
+            // back without forcing the full virtual keyboard.
+            val showInputView =
+                shouldForceShowInputView(
+                    isNullInputType = isNullInputType,
+                    isCandidatesView = isCandidatesView,
+                    isPrintingKey = e.isPrintingKey,
+                    hasNoModifiers = e.hasNoModifiers(),
+                )
             if (showInputView) {
                 evaluateOnKeyDownInner(service)
             }

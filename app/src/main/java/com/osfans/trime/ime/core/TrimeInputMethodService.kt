@@ -331,6 +331,7 @@ open class TrimeInputMethodService : LifecycleInputMethodService() {
      */
     override fun onConfigurationChanged(newConfig: Configuration) {
         postRimeJob { clearComposition() }
+        decorLocationUpdated = false
         val keyboardUiModeMask = ActivityInfo.CONFIG_KEYBOARD or
             ActivityInfo.CONFIG_KEYBOARD_HIDDEN or
             ActivityInfo.CONFIG_UI_MODE
@@ -340,18 +341,22 @@ open class TrimeInputMethodService : LifecycleInputMethodService() {
             super.onConfigurationChanged(newConfig)
         }
         lastKnownConfig.setTo(newConfig)
+        refreshCandidatesViewAnchor()
     }
 
     override fun onWindowShown() {
         super.onWindowShown()
         // navbar foreground/background color would reset every time window shows
         navBarManager.update(window.window!!)
+        refreshCandidatesViewAnchor()
     }
 
     private val contentSize = floatArrayOf(0f, 0f)
     private val decorLocation = floatArrayOf(0f, 0f)
     private val decorLocationInt = intArrayOf(0, 0)
     private var decorLocationUpdated = false
+
+    private var cursorAnchorUpdateIndex = 0
 
     private fun updateDecorLocation() {
         contentSize[0] = contentView.width.toFloat()
@@ -378,7 +383,30 @@ open class TrimeInputMethodService : LifecycleInputMethodService() {
         candidatesView?.updateCursorAnchor(anchorPosition, contentSize)
     }
 
+    /**
+     * Ask the editor for a fresh cursor anchor while also scheduling a safe fallback position.
+     *
+     * A successful requestCursorUpdates() only means that the request was accepted; editors are
+     * not guaranteed to deliver a new CursorAnchorInfo promptly or continuously. Terminal
+     * emulators and editors surviving multi-window geometry changes are particularly likely to
+     * stop updating it. The update index prevents the fallback from overriding a fresh callback.
+     */
+    private fun refreshCandidatesViewAnchor() {
+        if (!inputDeviceManager.isCandidatesView) return
+        decorLocationUpdated = false
+        val updateIndex = cursorAnchorUpdateIndex
+        decorView.post {
+            if (!inputDeviceManager.isCandidatesView || updateIndex != cursorAnchorUpdateIndex) {
+                return@post
+            }
+            updateDecorLocation()
+            workaroundNullCursorAnchorInfo()
+        }
+        currentInputConnection?.monitorCursorAnchor()
+    }
+
     override fun onUpdateCursorAnchorInfo(info: CursorAnchorInfo) {
+        cursorAnchorUpdateIndex += 1
         val bounds = info.getCharacterBounds(0)
         // update anchorPosition
         if (bounds == null) {
@@ -563,12 +591,7 @@ open class TrimeInputMethodService : LifecycleInputMethodService() {
             inputView?.startInput(attribute, restarting)
         }
         if (useCandidatesView) {
-            if (currentInputConnection?.monitorCursorAnchor() != true) {
-                if (!decorLocationUpdated) {
-                    updateDecorLocation()
-                }
-                workaroundNullCursorAnchorInfo()
-            }
+            refreshCandidatesViewAnchor()
         }
     }
 
